@@ -1,0 +1,116 @@
+#!/usr/bin/python
+# 2016-12-08
+# Grab NASA's 'Image of the Day', resize it, and save it as a PNG.
+# https://www.nasa.gov/multimedia/imagegallery/iotd.html
+#
+# Dependencies:
+#   feedparser
+#   pillow
+#   pycurl
+
+from io import BytesIO
+import os
+
+import feedparser
+import pycurl
+from PIL import Image
+from PIL import ImageDraw
+from PIL import ImageFont
+
+
+DESKTOP_WIDTH = 2650
+DESKTOP_HEIGHT = 1600
+
+def parseRss():
+    """Extracts the URI and description of the most recent 'Image of the Day'.
+    
+    Returns:
+        A tuple containing the URI of the image and a string description of the image.
+    """
+    nasa_rss = feedparser.parse('https://www.nasa.gov/rss/dyn/lg_image_of_the_day.rss')
+
+    recent = nasa_rss.entries[0]
+    description = recent.get('description', '')
+
+    image_url = str()
+    for enclosure in recent.links:
+        if enclosure['type'] == 'image/jpeg':
+            image_url = enclosure['href']
+
+    return (image_url, description)
+
+
+def getImage(image_url):
+    """Download the image from NASA.
+    
+    Args:
+        image_url: The string URI to download.
+        
+    Returns:
+        image_data: A BytesIO buffer containing the image data.
+    """
+    image_data = BytesIO()
+
+    c = pycurl.Curl()
+    c.setopt(pycurl.URL, image_url)
+    c.setopt(pycurl.FOLLOWLOCATION, True)
+    c.setopt(pycurl.WRITEDATA, image_data)
+    c.perform()
+    c.close()
+    return image_data
+
+
+def resizeImage(image):
+    """Resizes the image and maintains aspect ratio.
+    
+    The global variables DESKTOP_WIDTH and DESKTOP_HEIGHT are used to calculate
+    the aspect ratio of the original image. The ratio is then maintained when resizing
+    the image such that the maximum size is within the global variables defined.
+    
+    Args:
+        image: A pillow Image.
+        
+    Returns:
+        A pillow Image that has been resized.
+    """
+    x_ratio = float(DESKTOP_WIDTH/image.size[0])
+    y_ratio = float(DESKTOP_HEIGHT/image.size[1])
+
+    if x_ratio < y_ratio:
+        w, h = DESKTOP_WIDTH, int(image.size[1]*x_ratio)
+    else:
+        w, h = int(image.size[0]*y_ratio), DESKTOP_HEIGHT
+    return image.resize((w,h))
+
+
+def main():
+    (image_url, description) = parseRss()
+    image_data = getImage(image_url)
+
+    nasa_image = Image.open(image_data)
+    nasa_image = resizeImage(nasa_image)
+
+    draw = ImageDraw.Draw(nasa_image)
+    font = ImageFont.truetype('/usr/share/fonts/TTF/LiberationSerif-Regular.ttf', 18)
+    w, h = font.getsize(description)
+    x, y = (5, nasa_image.size[1]-h)
+    draw.rectangle((x, y, x+w, y+h), fill='black')
+    draw.text((x, y), description, fill=(164, 244, 66), font=font)
+
+    image = Image.new('RGB', (DESKTOP_WIDTH, DESKTOP_HEIGHT))
+
+    width_diff = DESKTOP_WIDTH-nasa_image.size[0]
+    height_diff = DESKTOP_HEIGHT-nasa_image.size[1]
+
+    box = tuple()
+    if width_diff > 0:
+        box = (int(width_diff/4), 0)
+    elif height_diff > 0:
+        box = (0, int(height_diff/4))
+
+    image.paste(nasa_image, box)
+    image.save(os.path.join(os.environ['HOME'], '.lockimg'), 'PNG')
+
+
+if __name__ == '__main__':
+    main()
