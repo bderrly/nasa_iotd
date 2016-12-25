@@ -8,8 +8,10 @@
 #   pillow
 #   requests
 
-from io import BytesIO
+import getopt
 import os
+import sys
+from io import BytesIO
 
 import feedparser
 import requests
@@ -20,6 +22,7 @@ from PIL import ImageFont
 
 DESKTOP_WIDTH = 2650
 DESKTOP_HEIGHT = 1600
+MAX_FILE_SIZE = 1 << 32
 
 def parseRss():
     """Extracts the URI and description of the most recent 'Image of the Day'.
@@ -76,11 +79,29 @@ def resizeImage(image):
     return image.resize((w,h))
 
 
-def main():
-    (image_url, description) = parseRss()
-    image_data = getImage(image_url)
+def main(argv):
+    try:
+        opts, args = getopt.getopt(argv, 'i:o:')
+    except getopt.GetoptError:
+        print('{} [-i <input file>] [-o <output file>]').format(sys.argv[0])
+        sys.exit(2)
 
-    nasa_image = Image.open(image_data)
+    input_file = None
+    output_file = None
+    for opt, arg in opts:
+        if opt == '-i':
+            input_file = arg
+        elif opt == '-o':
+            output_file = arg
+
+    if input_file is None:
+        (image_url, description) = parseRss()
+        image_data = getImage(image_url)
+    else:
+        with open(input_file, 'rb') as f:
+            image_data = f.read(MAX_FILE_SIZE)
+
+    nasa_image = Image.open(BytesIO(image_data))
     nasa_image = resizeImage(nasa_image)
 
     draw = ImageDraw.Draw(nasa_image)
@@ -102,8 +123,12 @@ def main():
         box = (0, int(height_diff/4))
 
     image.paste(nasa_image, box)
-    image.save(os.path.join(os.environ['HOME'], '.lockimg'), 'PNG')
+
+    if output_file is None:
+        output_file = os.path.join(os.environ['HOME'], '.lockimg')
+
+    image.save(output_file, 'PNG')
 
 
 if __name__ == '__main__':
-    main()
+    main(sys.argv)
