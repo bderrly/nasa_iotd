@@ -6,13 +6,12 @@
 # Dependencies:
 #   feedparser
 #   pillow
-#   pycurl
 
 from io import BytesIO
 import os
+import requests
 
 import feedparser
-import pycurl
 from PIL import Image
 from PIL import ImageDraw
 from PIL import ImageFont
@@ -47,17 +46,10 @@ def getImage(image_url):
         image_url: The string URI to download.
         
     Returns:
-        image_data: A BytesIO buffer containing the image data.
+        A buffer of bytes containing the image data.
     """
-    image_data = BytesIO()
-
-    c = pycurl.Curl()
-    c.setopt(pycurl.URL, image_url)
-    c.setopt(pycurl.FOLLOWLOCATION, True)
-    c.setopt(pycurl.WRITEDATA, image_data)
-    c.perform()
-    c.close()
-    return image_data
+    req = requests.get(image_url)
+    return req.content
 
 
 def resizeImage(image):
