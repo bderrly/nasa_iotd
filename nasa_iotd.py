@@ -6,12 +6,13 @@
 # Dependencies:
 #   feedparser
 #   pillow
+#   requests
 
 from io import BytesIO
 import os
-import requests
 
 import feedparser
+import requests
 from PIL import Image
 from PIL import ImageDraw
 from PIL import ImageFont
