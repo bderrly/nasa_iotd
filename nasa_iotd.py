@@ -8,10 +8,10 @@
 #   pillow
 #   requests
 
-import getopt
 import os
 import sys
 from io import BytesIO
+from optparse import OptionParser
 
 import feedparser
 import requests
@@ -43,17 +43,17 @@ def parseRss():
     return (image_url, description)
 
 
-def getImage(image_url):
+def downloadImage(image_url):
     """Download the image from NASA.
     
     Args:
         image_url: The string URI to download.
         
     Returns:
-        A buffer of bytes containing the image data.
+        A BytesIO object containing the image data.
     """
     req = requests.get(image_url)
-    return req.content
+    return BytesIO(req.content)
 
 
 def resizeImage(image):
@@ -69,66 +69,60 @@ def resizeImage(image):
     Returns:
         A pillow Image that has been resized.
     """
-    x_ratio = float(DESKTOP_WIDTH/image.size[0])
-    y_ratio = float(DESKTOP_HEIGHT/image.size[1])
+    x_ratio = float(DESKTOP_WIDTH / image.size[0])
+    y_ratio = float(DESKTOP_HEIGHT / image.size[1])
 
     if x_ratio < y_ratio:
-        w, h = DESKTOP_WIDTH, int(image.size[1]*x_ratio)
+        w, h = DESKTOP_WIDTH, int(image.size[1] * x_ratio)
     else:
-        w, h = int(image.size[0]*y_ratio), DESKTOP_HEIGHT
-    return image.resize((w,h))
+        w, h = int(image.size[0] * y_ratio), DESKTOP_HEIGHT
+    return image.resize((w, h))
 
 
-def main(argv):
-    try:
-        opts, args = getopt.getopt(argv, 'i:o:')
-    except getopt.GetoptError:
-        print('{} [-i <input file>] [-o <output file>]').format(sys.argv[0])
-        sys.exit(2)
+def main():
+    parser = OptionParser()
+    parser.add_option('-i', '--input_file', help='path to input file')
+    parser.add_option('-o', '--output_file', help='path to output file')
+    (options, args) = parser.parse_args()
 
-    input_file = None
-    output_file = None
-    for opt, arg in opts:
-        if opt == '-i':
-            input_file = arg
-        elif opt == '-o':
-            output_file = arg
+    (image_url, description) = parseRss()
 
-    if input_file is None:
-        (image_url, description) = parseRss()
-        image_data = getImage(image_url)
+    if options.input_file is None:
+        nasa_image = Image.open(downloadImage(image_url))
     else:
-        with open(input_file, 'rb') as f:
-            image_data = f.read(MAX_FILE_SIZE)
+        nasa_image = Image.open(options.input_file)
 
-    nasa_image = Image.open(BytesIO(image_data))
     nasa_image = resizeImage(nasa_image)
 
     draw = ImageDraw.Draw(nasa_image)
     font = ImageFont.truetype('/usr/share/fonts/TTF/LiberationSerif-Regular.ttf', 18)
     w, h = font.getsize(description)
-    x, y = (5, nasa_image.size[1]-h)
-    draw.rectangle((x, y, x+w, y+h), fill='black')
+    x, y = (5, nasa_image.size[1] - h)
+    draw.rectangle((x, y, x + w, y + h), fill='black')
     draw.text((x, y), description, fill=(164, 244, 66), font=font)
+    # draw.text((x, y), description, fill='green', font=font)
 
-    image = Image.new('RGB', (DESKTOP_WIDTH, DESKTOP_HEIGHT))
+    # If the resized NASA image does not have the same dimensions as the
+    # desktop, create a new image that is the same dimensions as the desktop
+    # and is entirely black. The NASA image will be pasted over the top of this
+    # to create a matte.
+    if nasa_image.size[0] != DESKTOP_WIDTH or nasa_image.size[1] != DESKTOP_HEIGHT:
+        image = Image.new('RGB', (DESKTOP_WIDTH, DESKTOP_HEIGHT))
+        width_diff = DESKTOP_WIDTH-nasa_image.size[0]
+        height_diff = DESKTOP_HEIGHT-nasa_image.size[1]
 
-    width_diff = DESKTOP_WIDTH-nasa_image.size[0]
-    height_diff = DESKTOP_HEIGHT-nasa_image.size[1]
+        if width_diff > 0:
+            box = (int(width_diff / 4), 0)
+        elif height_diff > 0:
+            box = (0, int(height_diff / 4))
 
-    box = tuple()
-    if width_diff > 0:
-        box = (int(width_diff/4), 0)
-    elif height_diff > 0:
-        box = (0, int(height_diff/4))
+        image.paste(nasa_image, box)
 
-    image.paste(nasa_image, box)
-
-    if output_file is None:
+    if options.output_file is None:
         output_file = os.path.join(os.environ['HOME'], '.lockimg')
 
     image.save(output_file, 'PNG')
 
 
 if __name__ == '__main__':
-    main(sys.argv)
+    main()
