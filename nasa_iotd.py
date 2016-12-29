@@ -9,7 +9,6 @@
 #   requests
 
 import os
-import sys
 from io import BytesIO
 from optparse import OptionParser
 
