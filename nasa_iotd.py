@@ -68,7 +68,7 @@ def resizeImage(image):
     Returns:
         A pillow Image that has been resized.
     """
-    if nasa_image.size[0] == DESKTOP_WIDTH and nasa_image.size[1] == DESKTOP_HEIGHT:
+    if image.size[0] == DESKTOP_WIDTH and image.size[1] == DESKTOP_HEIGHT:
         return image
     
     x_ratio = float(DESKTOP_WIDTH / image.size[0])
@@ -120,7 +120,8 @@ def main():
 
         image.paste(nasa_image, box)
 
-    if options.output_file is None:
+    output_file = options.output_file
+    if output_file is None:
         output_file = os.path.join(os.environ['HOME'], '.lockimg')
 
     image.save(output_file, 'PNG')
