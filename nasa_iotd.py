@@ -69,14 +69,17 @@ def resizeImage(image):
     Returns:
         A pillow Image that has been resized.
     """
+    if nasa_image.size[0] == DESKTOP_WIDTH and nasa_image.size[1] == DESKTOP_HEIGHT:
+        return image
+    
     x_ratio = float(DESKTOP_WIDTH / image.size[0])
     y_ratio = float(DESKTOP_HEIGHT / image.size[1])
 
     if x_ratio < y_ratio:
-        w, h = DESKTOP_WIDTH, int(image.size[1] * x_ratio)
+        width, height = DESKTOP_WIDTH, int(image.size[1] * x_ratio)
     else:
-        w, h = int(image.size[0] * y_ratio), DESKTOP_HEIGHT
-    return image.resize((w, h))
+        width, height = int(image.size[0] * y_ratio), DESKTOP_HEIGHT
+    return image.resize((width, height))
 
 
 def main():
