@@ -23,7 +23,7 @@ DESKTOP_WIDTH = 2650
 DESKTOP_HEIGHT = 1600
 MAX_FILE_SIZE = 1 << 24 # 16 MiB
 
-def parseRss():
+def parseRss(verbose=False):
     """Extracts the URI and description of the most recent 'Image of the Day'.
     
     Returns:
@@ -32,6 +32,8 @@ def parseRss():
     nasa_rss = feedparser.parse('https://www.nasa.gov/rss/dyn/lg_image_of_the_day.rss')
 
     recent = nasa_rss.entries[0]
+    if verbose:
+        print('grabbing image published {}'.format(recent.get('published', 'unknown')))
     description = recent.get('description', '')
 
     image_url = str()
@@ -55,7 +57,7 @@ def downloadImage(image_url):
     return BytesIO(req.content)
 
 
-def resizeImage(image):
+def resizeImage(image, verbose=False):
     """Resizes the image and maintains aspect ratio.
     
     The global variables DESKTOP_WIDTH and DESKTOP_HEIGHT are used to calculate
@@ -69,8 +71,13 @@ def resizeImage(image):
         A pillow Image that has been resized.
     """
     if image.size[0] == DESKTOP_WIDTH and image.size[1] == DESKTOP_HEIGHT:
+        if verbose:
+            print('image is same size as desktop dimensions')
         return image
     
+    if verbose:
+        print('image is {}x{}'.format(image.size[0], image.size[1]))
+
     x_ratio = float(DESKTOP_WIDTH / image.size[0])
     y_ratio = float(DESKTOP_HEIGHT / image.size[1])
 
@@ -78,6 +85,9 @@ def resizeImage(image):
         width, height = DESKTOP_WIDTH, int(image.size[1] * x_ratio)
     else:
         width, height = int(image.size[0] * y_ratio), DESKTOP_HEIGHT
+
+    if verbose:
+        print('resized image to {}x{}'.format(width, height))
     return image.resize((width, height))
 
 
@@ -85,22 +95,28 @@ def main():
     parser = argparse.ArgumentParser(description='Download NASA\'s Image of the Day')
     parser.add_argument('-i', '--input_file', help='path to input file')
     parser.add_argument('-o', '--output_file', help='path to output file')
-    # parser.add_argument('-c', '--cache_image', help='save unmodified image to /tmp')
-    # parser.add_argument('-v', '--verbosity', type=int, default=0, help='increase verbosity, 0=none, 1=basic, 2=debug')
+    parser.add_argument('-c', '--cache_image', action='store_true', help='save unmodified image to /tmp')
+    parser.add_argument('-v', '--verbose', action='store_true', help='verbose logging')
     args = parser.parse_args()
 
-    (image_url, description) = parseRss()
+    (image_url, description) = parseRss(args.verbose)
 
     if args.input_file is None:
         nasa_image = Image.open(downloadImage(image_url))
     else:
         nasa_image = Image.open(args.input_file)
 
+    if args.cache_image:
+        filename = image_url.rsplit('/', 1)[1]
+        if args.verbose:
+            print('writing unmodified image to /tmp/{}'.format(filename))
+        nasa_image.save('/tmp/' + filename)
+
     output_file = args.output_file
     if output_file is None:
         output_file = os.path.join(os.environ['HOME'], '.lockimg')
 
-    nasa_image = resizeImage(nasa_image)
+    nasa_image = resizeImage(nasa_image, args.verbose)
 
     draw = ImageDraw.Draw(nasa_image)
     font = ImageFont.truetype('/usr/share/fonts/TTF/LiberationSerif-Regular.ttf', 18)
@@ -128,6 +144,9 @@ def main():
 
         box = (box_width, box_height)
         matte.paste(nasa_image, box)
+
+    if args.verbose:
+        print('writing modified image to {}'.format(output_file))
 
     if matte is None:
         nasa_image.save(output_file, 'PNG')
