@@ -8,9 +8,9 @@
 #   pillow
 #   requests
 
+import argparse
 import os
 from io import BytesIO
-from optparse import OptionParser
 
 import feedparser
 import requests
@@ -82,17 +82,23 @@ def resizeImage(image):
 
 
 def main():
-    parser = OptionParser()
-    parser.add_option('-i', '--input_file', help='path to input file')
-    parser.add_option('-o', '--output_file', help='path to output file')
-    (options, args) = parser.parse_args()
+    parser = argparse.ArgumentParser(description='Download NASA\'s Image of the Day')
+    parser.add_argument('-i', '--input_file', help='path to input file')
+    parser.add_argument('-o', '--output_file', help='path to output file')
+    # parser.add_argument('-c', '--cache_image', help='save unmodified image to /tmp')
+    # parser.add_argument('-v', '--verbosity', type=int, default=0, help='increase verbosity, 0=none, 1=basic, 2=debug')
+    args = parser.parse_args()
 
     (image_url, description) = parseRss()
 
-    if options.input_file is None:
+    if args.input_file is None:
         nasa_image = Image.open(downloadImage(image_url))
     else:
-        nasa_image = Image.open(options.input_file)
+        nasa_image = Image.open(args.input_file)
+
+    output_file = args.output_file
+    if output_file is None:
+        output_file = os.path.join(os.environ['HOME'], '.lockimg')
 
     nasa_image = resizeImage(nasa_image)
 
@@ -103,6 +109,7 @@ def main():
     draw.rectangle((x, y, x + w, y + h), fill='black')
     draw.text((x, y), description, fill=(164, 244, 66), font=font)
 
+    matte = None
     # If the resized NASA image does not have the same dimensions as the
     # desktop, create a new image that is the same dimensions as the desktop
     # and is entirely black. The NASA image will be pasted over the top of this
@@ -122,11 +129,10 @@ def main():
         box = (box_width, box_height)
         matte.paste(nasa_image, box)
 
-    output_file = options.output_file
-    if output_file is None:
-        output_file = os.path.join(os.environ['HOME'], '.lockimg')
-
-    image.save(output_file, 'PNG')
+    if matte is None:
+        nasa_image.save(output_file, 'PNG')
+    else:
+        matte.save(output_file, 'PNG')
 
 
 if __name__ == '__main__':
