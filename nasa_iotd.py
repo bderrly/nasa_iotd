@@ -21,7 +21,7 @@ from PIL import ImageFont
 
 DESKTOP_WIDTH = 2650
 DESKTOP_HEIGHT = 1600
-MAX_FILE_SIZE = 1 << 32
+MAX_FILE_SIZE = 1 << 24 # 16 MiB
 
 def parseRss():
     """Extracts the URI and description of the most recent 'Image of the Day'.
