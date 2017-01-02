@@ -102,23 +102,25 @@ def main():
     x, y = (5, nasa_image.size[1] - h)
     draw.rectangle((x, y, x + w, y + h), fill='black')
     draw.text((x, y), description, fill=(164, 244, 66), font=font)
-    # draw.text((x, y), description, fill='green', font=font)
 
     # If the resized NASA image does not have the same dimensions as the
     # desktop, create a new image that is the same dimensions as the desktop
     # and is entirely black. The NASA image will be pasted over the top of this
     # to create a matte.
     if nasa_image.size[0] != DESKTOP_WIDTH or nasa_image.size[1] != DESKTOP_HEIGHT:
-        image = Image.new('RGB', (DESKTOP_WIDTH, DESKTOP_HEIGHT))
-        width_diff = DESKTOP_WIDTH-nasa_image.size[0]
-        height_diff = DESKTOP_HEIGHT-nasa_image.size[1]
+        matte = Image.new('RGB', (DESKTOP_WIDTH, DESKTOP_HEIGHT))
+        width_diff = DESKTOP_WIDTH - nasa_image.size[0]
+        height_diff = DESKTOP_HEIGHT - nasa_image.size[1]
 
+        box_width, box_height = 0, 0
         if width_diff > 0:
-            box = (int(width_diff / 4), 0)
-        elif height_diff > 0:
-            box = (0, int(height_diff / 4))
+            box_width = int(width_diff / 4)
 
-        image.paste(nasa_image, box)
+        if height_diff > 0:
+            box_height = int(height_diff / 4)
+
+        box = (box_width, box_height)
+        matte.paste(nasa_image, box)
 
     output_file = options.output_file
     if output_file is None:
