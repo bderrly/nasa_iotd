@@ -112,13 +112,17 @@ def main():
             print('writing unmodified image to /tmp/{}'.format(filename))
         nasa_image.save('/tmp/' + filename)
 
-    output_file = args.output_file
-    if output_file is None:
+    if args.output_file is None:
         output_file = os.path.join(os.environ['HOME'], '.lockimg')
+    else:
+        output_file = args.output_file
 
     nasa_image = resizeImage(nasa_image, args.verbose)
 
     draw = ImageDraw.Draw(nasa_image)
+
+    # TODO(Brian): If the text is longer than the width of the image it flows off the image.
+    # Determine if the text is too long and if so then make the surrounding box taller and wrap the text.
     font = ImageFont.truetype('/usr/share/fonts/TTF/LiberationSerif-Regular.ttf', 18)
     w, h = font.getsize(description)
     x, y = (5, nasa_image.size[1] - h)
