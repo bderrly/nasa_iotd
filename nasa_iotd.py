@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# 2016-12-08
+#
 # Grab NASA's 'Image of the Day', resize it, and save it as a PNG.
 # https://www.nasa.gov/multimedia/imagegallery/iotd.html
 #
@@ -17,7 +17,6 @@ import requests
 from PIL import Image
 from PIL import ImageDraw
 from PIL import ImageFont
-
 
 DESKTOP_WIDTH = 2650
 DESKTOP_HEIGHT = 1600
@@ -65,10 +64,10 @@ def resizeImage(image, verbose=False):
     the image such that the maximum size is within the global variables defined.
     
     Args:
-        image: A pillow Image.
+        image: An Image object.
         
     Returns:
-        A pillow Image that has been resized.
+        A new Image that has been resized.
     """
     if image.size[0] == DESKTOP_WIDTH and image.size[1] == DESKTOP_HEIGHT:
         if verbose:
@@ -89,6 +88,45 @@ def resizeImage(image, verbose=False):
     if verbose:
         print('resized image to {}x{}'.format(width, height))
     return image.resize((width, height))
+
+
+def drawDescription(image, font, description):
+    """
+    Draw the description onto the image.
+
+    This function will wrap the text if it is wider than the image.
+
+    Args:
+        image: An Image object.
+        font: An ImageFont object.
+        description: A string.
+    """
+    def _toowide(line):
+        width, _ = font.getsize(line)
+        if width > image.size[0]:
+            return True
+        return False
+
+    line = description.split()
+    wrapped = []
+    continuation = []
+    while True:
+        while _toowide(' '.join(line)):
+            continuation.insert(0, line.pop())
+
+        wrapped.append(' '.join(line))
+        if _toowide(' '.join(continuation)):
+            line = continuation
+        else:
+            wrapped.append(' '.join(continuation))
+            break
+
+    draw = ImageDraw.Draw(image)
+
+    width, height = draw.multiline_textsize('\n'.join(wrapped), font)
+    x, y = (5, image.size[1] - height)
+    draw.rectangle((x, y, x + width, y + height), fill='black')
+    draw.multiline_text((x, y), '\n'.join(wrapped), fill='lime', font=font)
 
 
 def main():
@@ -118,16 +156,8 @@ def main():
         output_file = args.output_file
 
     nasa_image = resizeImage(nasa_image, args.verbose)
-
-    draw = ImageDraw.Draw(nasa_image)
-
-    # TODO(Brian): If the text is longer than the width of the image it flows off the image.
-    # Determine if the text is too long and if so then make the surrounding box taller and wrap the text.
     font = ImageFont.truetype('/usr/share/fonts/TTF/LiberationSerif-Regular.ttf', 18)
-    w, h = font.getsize(description)
-    x, y = (5, nasa_image.size[1] - h)
-    draw.rectangle((x, y, x + w, y + h), fill='black')
-    draw.text((x, y), description, fill=(164, 244, 66), font=font)
+    drawDescription(nasa_image, font, description)
 
     matte = None
     # If the resized NASA image does not have the same dimensions as the
