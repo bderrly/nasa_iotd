@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 # Grab NASA's 'Image of the Day', resize it, and save it as a PNG.
 # https://www.nasa.gov/multimedia/imagegallery/iotd.html
@@ -20,34 +20,34 @@ from PIL import ImageFont
 
 DESKTOP_WIDTH = 2650
 DESKTOP_HEIGHT = 1600
-MAX_FILE_SIZE = 1 << 24 # 16 MiB
+
 
 def parseRss(verbose=False):
-    """Extracts the URI and description of the most recent 'Image of the Day'.
+    """Extracts the URL and description of the most recent 'Image of the Day'.
     
     Returns:
-        A tuple containing the URI of the image and a string description of the image.
+        A tuple containing the URL of the image and a string description of the image.
     """
     nasa_rss = feedparser.parse('https://www.nasa.gov/rss/dyn/lg_image_of_the_day.rss')
 
     recent = nasa_rss.entries[0]
     if verbose:
         print('grabbing image published {}'.format(recent.get('published', 'unknown')))
-    description = recent.get('description', '')
+    description = recent.get('description', None)
 
     image_url = str()
     for enclosure in recent.links:
         if enclosure['type'] == 'image/jpeg':
             image_url = enclosure['href']
 
-    return (image_url, description)
+    return image_url, description
 
 
 def downloadImage(image_url):
     """Download the image from NASA.
     
     Args:
-        image_url: The string URI to download.
+        image_url: The string URL to download.
         
     Returns:
         A BytesIO object containing the image data.
@@ -57,36 +57,39 @@ def downloadImage(image_url):
 
 
 def resizeImage(image, verbose=False):
-    """Resizes the image and maintains aspect ratio.
+    """Resizes the image while maintaining aspect ratio.
     
     The global variables DESKTOP_WIDTH and DESKTOP_HEIGHT are used to calculate
     the aspect ratio of the original image. The ratio is then maintained when resizing
     the image such that the maximum size is within the global variables defined.
     
     Args:
-        image: An Image object.
+        image: A Pillow Image object.
         
     Returns:
-        A new Image that has been resized.
+        A new Pillow Image object that has been resized.
     """
-    if image.size[0] == DESKTOP_WIDTH and image.size[1] == DESKTOP_HEIGHT:
+    image_width = image.size[0]
+    image_height = image.size[1]
+    if image_width == DESKTOP_WIDTH and image_height == DESKTOP_HEIGHT:
         if verbose:
-            print('image is same size as desktop dimensions')
+            print('image is same size as desktop dimensions, nothing to do')
         return image
     
     if verbose:
-        print('image is {}x{}'.format(image.size[0], image.size[1]))
+        print('unmodified image is {}×{}'.format(image_width, image_height))
 
-    x_ratio = float(DESKTOP_WIDTH / image.size[0])
-    y_ratio = float(DESKTOP_HEIGHT / image.size[1])
+    x_ratio = float(DESKTOP_WIDTH / image_width)
+    y_ratio = float(DESKTOP_HEIGHT / image_height)
 
     if x_ratio < y_ratio:
-        width, height = DESKTOP_WIDTH, int(image.size[1] * x_ratio)
+        width, height = DESKTOP_WIDTH, int(image_height * x_ratio)
     else:
-        width, height = int(image.size[0] * y_ratio), DESKTOP_HEIGHT
+        width, height = int(image_width * y_ratio), DESKTOP_HEIGHT
 
     if verbose:
-        print('resized image to {}x{}'.format(width, height))
+        print('resized image to {}×{}'.format(width, height))
+
     return image.resize((width, height))
 
 
@@ -97,13 +100,15 @@ def drawDescription(image, font, description):
     This function will wrap the text if it is wider than the image.
 
     Args:
-        image: An Image object.
-        font: An ImageFont object.
+        image: A Pillow Image object.
+        font: A Pillow ImageFont object.
         description: A string.
     """
     def _toowide(line):
         width, _ = font.getsize(line)
-        if width > image.size[0]:
+        # Subtract 5 pixels from the width to allow a little space for
+        # readability on the right side of the image.
+        if width > image.size[0] - 5:
             return True
         return False
 
@@ -111,11 +116,15 @@ def drawDescription(image, font, description):
     wrapped = []
     continuation = []
     while True:
+        # Loop over the description popping off the last word until it is less
+        # wide than the image. The words popped off are inserted into the
+        # beginning of continuation to provide proper word order.
         while _toowide(' '.join(line)):
             continuation.insert(0, line.pop())
 
         wrapped.append(' '.join(line))
         if _toowide(' '.join(continuation)):
+            # Still need to wrap another line.
             line = continuation
         else:
             wrapped.append(' '.join(continuation))
@@ -129,63 +138,75 @@ def drawDescription(image, font, description):
     draw.multiline_text((x, y), '\n'.join(wrapped), fill='lime', font=font)
 
 
-def main():
+def addMatte(image):
+    """Create a black matte and paste image over the top.
+
+    Args:
+        image: A Pillow Image object.
+
+    Returns:
+        A new Pillow Image object.
+    """
+    image_width = image.size[0]
+    image_height = image.size[1]
+    width_diff = DESKTOP_WIDTH - image_width
+    height_diff = DESKTOP_HEIGHT - image_height
+
+    box_width, box_height = 0, 0
+    # TODO(Brian): This centering isn't working properly. Take another look at it.
+    if width_diff > 0:
+        box_width = int(width_diff / 4)
+
+    if height_diff > 0:
+        box_height = int(height_diff / 4)
+
+    # Defines the x & y coordinates to begin pasting the image over the matte.
+    box = (box_width, box_height)
+
+    matte = Image.new('RGB', (DESKTOP_WIDTH, DESKTOP_HEIGHT))
+    matte.paste(image, box)
+    return matte
+
+
+def parseArguments():
     parser = argparse.ArgumentParser(description='Download NASA\'s Image of the Day')
     parser.add_argument('-i', '--input_file', help='path to input file')
     parser.add_argument('-o', '--output_file', help='path to output file')
     parser.add_argument('-c', '--cache_image', action='store_true', help='save unmodified image to /tmp')
     parser.add_argument('-v', '--verbose', action='store_true', help='verbose logging')
-    args = parser.parse_args()
+    return parser.parse_args()
 
-    (image_url, description) = parseRss(args.verbose)
+
+def main():
+    args = parseArguments()
+
+    image_url, description = parseRss(args.verbose)
 
     if args.input_file is None:
         nasa_image = Image.open(downloadImage(image_url))
     else:
         nasa_image = Image.open(args.input_file)
 
+    output_filename = image_url.rsplit('/', 1)[1]
     if args.cache_image:
-        filename = image_url.rsplit('/', 1)[1]
         if args.verbose:
-            print('writing unmodified image to /tmp/{}'.format(filename))
-        nasa_image.save('/tmp/' + filename)
+            print('writing unmodified image to /tmp/{}'.format(output_filename))
+        nasa_image.save('/tmp/' + output_filename)
 
     if args.output_file is None:
-        output_file = os.path.join(os.environ['HOME'], '.lockimg')
+        output_file = os.path.join(os.environ['HOME'], output_filename)
     else:
         output_file = args.output_file
 
-    nasa_image = resizeImage(nasa_image, args.verbose)
+    resized_image = resizeImage(nasa_image, args.verbose)
     font = ImageFont.truetype('/usr/share/fonts/TTF/LiberationSerif-Regular.ttf', 18)
-    drawDescription(nasa_image, font, description)
-
-    matte = None
-    # If the resized NASA image does not have the same dimensions as the
-    # desktop, create a new image that is the same dimensions as the desktop
-    # and is entirely black. The NASA image will be pasted over the top of this
-    # to create a matte.
-    if nasa_image.size[0] != DESKTOP_WIDTH or nasa_image.size[1] != DESKTOP_HEIGHT:
-        matte = Image.new('RGB', (DESKTOP_WIDTH, DESKTOP_HEIGHT))
-        width_diff = DESKTOP_WIDTH - nasa_image.size[0]
-        height_diff = DESKTOP_HEIGHT - nasa_image.size[1]
-
-        box_width, box_height = 0, 0
-        if width_diff > 0:
-            box_width = int(width_diff / 4)
-
-        if height_diff > 0:
-            box_height = int(height_diff / 4)
-
-        box = (box_width, box_height)
-        matte.paste(nasa_image, box)
+    drawDescription(resized_image, font, description)
+    completed_image = addMatte(resized_image)
 
     if args.verbose:
-        print('writing modified image to {}'.format(output_file))
+        print('writing modified image to', output_file)
 
-    if matte is None:
-        nasa_image.save(output_file, 'PNG')
-    else:
-        matte.save(output_file, 'PNG')
+    completed_image.save(output_file, 'PNG')
 
 
 if __name__ == '__main__':
