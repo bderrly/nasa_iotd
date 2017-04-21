@@ -18,7 +18,7 @@ from PIL import Image
 from PIL import ImageDraw
 from PIL import ImageFont
 
-DESKTOP_WIDTH = 2650
+DESKTOP_WIDTH = 2560
 DESKTOP_HEIGHT = 1600
 
 
@@ -152,19 +152,18 @@ def addMatte(image):
     width_diff = DESKTOP_WIDTH - image_width
     height_diff = DESKTOP_HEIGHT - image_height
 
-    box_width, box_height = 0, 0
-    # TODO(Brian): This centering isn't working properly. Take another look at it.
+    origin_x, origin_y = 0, 0
     if width_diff > 0:
-        box_width = int(width_diff / 4)
+        origin_x = int(width_diff / 2)
 
     if height_diff > 0:
-        box_height = int(height_diff / 4)
+        origin_y = int(height_diff / 2)
 
     # Defines the x & y coordinates to begin pasting the image over the matte.
-    box = (box_width, box_height)
+    origin = (origin_x, origin_y)
 
     matte = Image.new('RGB', (DESKTOP_WIDTH, DESKTOP_HEIGHT))
-    matte.paste(image, box)
+    matte.paste(image, origin)
     return matte
 
 
