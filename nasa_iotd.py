@@ -110,8 +110,9 @@ def main(argv):
 
     parser = argparse.ArgumentParser(
             description='Downloads and formats the Image of the Day from nasa.org.')
-    parser.add_argument('-i', '--input_file')
-    parser.add_argument('-o', '--output_file')
+    parser.add_argument('-i', '--input_file', help='The name of the file to read from disk. (Does not read from RSS and adds no description to the final image.)')
+    parser.add_argument('-o', '--output_file', help='The name of the file to write to disk.')
+    parser.add_argument('-d', '--directory', default=os.environ['PWD'], help='Directory to write image file. (default: $PWD)')
     args = parser.parse_args()
 
     image_url = None
@@ -123,6 +124,7 @@ def main(argv):
         with open(args.input_file, 'rb') as f:
             image_data = f.read(MAX_FILE_SIZE)
 
+    nasa_image_filename = os.path.basename(image_url)
     nasa_image = Image.open(BytesIO(image_data))
     nasa_image = resizeImage(nasa_image, desktop_width, desktop_height)
 
@@ -143,9 +145,9 @@ def main(argv):
     image.paste(nasa_image, box)
 
     if args.output_file is None:
-        output_file = os.path.join(os.environ['HOME'], '.lockimg')
+        output_file = os.path.join(args.directory, nasa_image_filename)
     else:
-        output_file = args.output_file
+        output_file = os.path.join(args.directory, args.output_file)
 
     try:
         image.save(output_file, 'PNG')
