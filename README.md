@@ -1,12 +1,14 @@
 # NASA Image of the Day downloader
 
-My original plan was to have a fresh daily image for my workstation lock
-screen. You could also use it for a rotating desktop image or something to that
-effect.
+Downloads the most recent image from NASA's Image of the Day RSS feed. After
+the image is downloaded it is resized to fit the desktop resolution
+(maintaining aspect ratio). Finally, the text description from the RSS feed is
+added to the image.
 
 ## Requirements
 
-- python
-- python [requests](https://pypi.python.org/pypi/requests/)
-- python [feedparser](https://pypi.python.org/pypi/feedparser)
-- python [pillow](https://python-pillow.org/)
+- [python](https://www.python.org/)
+- [requests](https://pypi.org/project/requests/)
+- [feedparser](https://pypi.org/project/feedparser/)
+- [pillow](https://pypi.org/project/Pillow/)
+- [python-xlib](https://pypi.org/project/xlib/)
