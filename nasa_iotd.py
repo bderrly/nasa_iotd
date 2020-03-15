@@ -154,7 +154,7 @@ def main(argv):
         output_file = os.path.join(args.directory, args.output_file)
 
     try:
-        image.save(output_file, 'PNG')
+        image.save(output_file, 'JPEG')
     except IOError as ioe:
         print('IO failure: {}'.format(ioe), file=sys.stderr)
 
