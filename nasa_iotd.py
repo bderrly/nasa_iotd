@@ -145,7 +145,11 @@ def main(argv):
     image.paste(nasa_image, box)
 
     if args.output_file is None:
-        output_file = os.path.join(args.directory, nasa_image_filename)
+        if args.input_file is None:
+            # File name from RSS feed
+            output_file = os.path.join(args.directory, nasa_image_filename)
+        else:
+            output_file = os.path.join(args.directory, os.path.basename(args.input_file))
     else:
         output_file = os.path.join(args.directory, args.output_file)
 
