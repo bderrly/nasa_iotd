@@ -28,23 +28,37 @@ from Xlib import display
 
 MAX_FILE_SIZE = 1 << 25  # 2^25 == 33.6 MiB
 
-def parseRss():
-    """Extracts the URI and description of the most recent 'Image of the Day'.
+
+def getRssItems(count):
+    """Returns the image URI, size, and description of the latest _count_ items.
     
     Returns:
-        A tuple containing the URI of the image and a string description of the image.
+        A list of dicts containing the URI and size of the image to download and a string description of the image.
     """
     nasa_rss = feedparser.parse('https://www.nasa.gov/rss/dyn/lg_image_of_the_day.rss')
 
-    recent = nasa_rss.entries[0]
-    description = recent.get('description', '')
+    parsed_items = list()
+    entries = nasa_rss.entries[:count]
+    for entry in entries:
+        description = entry.get('description')
 
-    image_url = str()
-    for enclosure in recent.links:
-        if enclosure['type'] == 'image/jpeg':
-            image_url = enclosure['href']
+        if len(entry.enclosures) < 1:
+            # If there are no enclosures then there are no images so let's move on.
+            continue
 
-    return (image_url, description)
+        enclosure = entry.enclosures[0]
+        if enclosure['type'] != 'image/jpeg':
+            # If the enclosure does not have a JPEG then there's nothing to do.
+            continue
+
+        if len(entry.enclosures) > 1:
+            print("Found more than one image in item {}; taking the first image.".format(entry['guid']), file=sys.stderr)
+
+        image_url = enclosure['href']
+        image_size = enclosure['length']
+        parsed_items.append({'url': image_url, 'size': image_size, 'desc': description})
+
+    return parsed_items
 
 
 def getImage(image_url):
@@ -75,18 +89,19 @@ def resizeImage(image, desktop_width, desktop_height):
     Returns:
         A pillow Image that has been resized.
     """
-    if image.size[0] <= desktop_width and image.size[1] <= desktop_height:
+    if image.width <= desktop_width and image.height <= desktop_height:
+        # The image is already smaller than the desktop resolution so there is
+        # no reason to resize it.
         return image
 
-    x_ratio = float(desktop_width/image.size[0])
-    y_ratio = float(desktop_height/image.size[1])
+    x_ratio = float(desktop_width/image.width)
+    y_ratio = float(desktop_height/image.height)
 
     if x_ratio < y_ratio:
-        w, h = desktop_width, int(image.size[1]*x_ratio)
+        w, h = desktop_width, int(image.height*x_ratio)
     else:
-        w, h = int(image.size[0]*y_ratio), desktop_height
-    # print("NASA image resized from {}x{} ({}) to {}x{} ({})".format(image.size[0], image.size[1], image.size[0]/image.size[1], w, h, w/h))
-    return image.resize((w,h))
+        w, h = int(image.width*y_ratio), desktop_height
+    return image.resize((w, h))
 
 
 def getScreenResolution():
@@ -101,6 +116,13 @@ def getScreenResolution():
     return (scr.width_in_pixels, scr.height_in_pixels)
     
 
+def writeImageToDisk(file_name, image):
+    try:
+        image.save(file_name, 'JPEG')
+    except IOError as ioe:
+        print('IO failure: {}'.format(ioe), file=sys.stderr)
+
+
 def main(argv):
     desktop_width, desktop_height = getScreenResolution()
 
@@ -110,53 +132,62 @@ def main(argv):
 
     parser = argparse.ArgumentParser(
             description='Downloads and formats the Image of the Day from nasa.org.')
-    parser.add_argument('-i', '--input_file', help='The name of the file to read from disk. (Does not read from RSS and adds no description to the final image.)')
-    parser.add_argument('-o', '--output_file', help='The name of the file to write to disk.')
+    parser.add_argument('-c', '--count', type=int, default=1, help="The number of RSS items to retrieve. (default: 1)")
+    parser.add_argument('-i', '--input_file', help="The name of the file to read from disk. (Does not read from RSS and adds no description to the final image.)")
+    parser.add_argument('-o', '--output_file', help="The name of the file to write to disk.")
     parser.add_argument('-d', '--directory', default=os.environ['PWD'], help='Directory to write image file. (default: $PWD)')
     args = parser.parse_args()
 
-    image_url = None
-    description = None
-    if args.input_file is None:
-        image_url, description = parseRss()
-        image_data = getImage(image_url)
-    else:
+    # If we are operating on a local file it is probably for testing purposes
+    # because all we're going to do is resize the image and write it to disk.
+    if args.input_file is not None:
         with open(args.input_file, 'rb') as f:
             image_data = f.read(MAX_FILE_SIZE)
-
-    nasa_image_filename = os.path.basename(image_url)
-    nasa_image = Image.open(BytesIO(image_data))
-    nasa_image = resizeImage(nasa_image, desktop_width, desktop_height)
-
-    if description:
-        draw = ImageDraw.Draw(nasa_image)
-        font = ImageFont.truetype('/usr/share/fonts/TTF/LiberationSerif-Regular.ttf', 18)
-        w, h = font.getsize(description)
-        x, y = (5, nasa_image.size[1]-h)
-        draw.rectangle((x, y, x+w, y+h), fill='black')
-        draw.text((x, y), description, fill=(164, 244, 66), font=font)
-
-    image = Image.new('RGB', (desktop_width, desktop_height))
-
-    # Define the origin coordinates to begin pasting the NASA image
-    # over the blank image. This is a tuple of (x, y).
-    box = (int(.5*desktop_width-.5*nasa_image.size[0]),
-           int(.5*desktop_height-.5*nasa_image.size[1]))
-    image.paste(nasa_image, box)
-
-    if args.output_file is None:
-        if args.input_file is None:
-            # File name from RSS feed
-            output_file = os.path.join(args.directory, nasa_image_filename)
-        else:
+            image = Image.open(BytesIO(image_data))
+            image = resizeImage(image, desktop_width, desktop_height)
+        output_file = args.output_file
+        if output_file is None:
             output_file = os.path.join(args.directory, os.path.basename(args.input_file))
-    else:
-        output_file = os.path.join(args.directory, args.output_file)
+        writeImageToDisk(output_file, image)
+        return
 
-    try:
-        image.save(output_file, 'JPEG')
-    except IOError as ioe:
-        print('IO failure: {}'.format(ioe), file=sys.stderr)
+    rss_items = getRssItems(args.count)
+    for item in rss_items:
+        print("Processing {}…".format(item['url']))
+        image_data = getImage(item['url'])
+        if int(item['size']) != int(len(image_data)):
+            print("File size differs between RSS and downloaded image: {} versus {} bytes.".format(item['size'], len(image_data)))
+        # Cut out only the file name portion of the image's URL. This will
+        # potentially be used for the output file name.
+        nasa_image_filename = item['url'].rsplit('/', 1)[1]
+        nasa_image = Image.open(BytesIO(image_data))
+        nasa_image = resizeImage(nasa_image, desktop_width, desktop_height)
+
+        # Overlay the description from the RSS item over the NASA image.
+        description = item.get('desc')
+        if description is not None:
+            draw = ImageDraw.Draw(nasa_image)
+            font = ImageFont.truetype('/usr/share/fonts/TTF/LiberationSerif-Regular.ttf', 18)
+            w, h = font.getsize(description)
+            if int(w) > int(nasa_image.width):
+                print("The text overlay is wider than the image: {} versus {}".format(w, nasa_image.width))
+            x, y = (5, nasa_image.height-h)
+            draw.rectangle((x, y, x+w, y+h), fill='black')
+            draw.text((x, y), description, fill=(164, 244, 66), font=font)
+
+        # Create a new, blank image the size of the desktop resolution.
+        image = Image.new('RGB', (desktop_width, desktop_height))
+
+        # Define the origin coordinates to begin pasting the NASA image
+        # over the blank image. This is a tuple of (x, y).
+        box = (int(.5*desktop_width-.5*nasa_image.width),
+               int(.5*desktop_height-.5*nasa_image.height))
+
+        # Paste the NASA image over the newly created black image.
+        image.paste(nasa_image, box)
+
+        output_file = os.path.join(args.directory, nasa_image_filename)
+        writeImageToDisk(output_file, image)
 
 
 if __name__ == '__main__':
