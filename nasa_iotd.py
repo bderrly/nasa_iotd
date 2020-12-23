@@ -78,7 +78,7 @@ def getScreenResolution():
     """Return the root screen resolution using Xlib.
 
     Returns:
-        A two-tuple, the width and height of the root screen in pixels.
+        A 2-tuple, the width and height of the root screen in pixels.
     """
     try:
         d = display.Display()
