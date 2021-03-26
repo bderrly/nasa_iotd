@@ -99,19 +99,17 @@ def writeImageToDisk(file_name, image):
         sys.exit(1)
 
 
-def reflowText(text, width, font=None):
+def reflowText(text, width, font):
     """Adds line breaks, if necessary, so all text can fit within width.
 
     Args:
         text: A string, the text to reformat.
         width: An int, the width of the screen in pixels.
-        font: (optional) An ImageFont, the font to use on the image.
+        font: An ImageFont, the font to use on the image.
 
     Returns:
         A string, the reformatted text.
     """
-    if font is None:
-        font = ImageFont.truetype('/usr/share/fonts/TTF/LiberationSerif-Regular.ttf', 18)
     if font.getlength(text) <= width - 20:
         return text
 
@@ -177,7 +175,7 @@ def main(argv):
     parser.add_argument('-d', '--directory', default=os.environ['PWD'], help='Directory to write image file. (default: $PWD)')
     parser.add_argument('-i', '--input-file',
             help="The name of the file to read from disk. (Does not read from RSS and adds no description to the final image.)")
-    parser.add_argument('-f', '--font', default="fonts/Play-Bold.ttf",
+    parser.add_argument('-f', '--font', default="fonts/Play/Play-Bold.ttf",
             help="The path to the TrueType font to use for the image description.")
     parser.add_argument('-o', '--output-file', help="The name of the file to write to disk.")
     parser.add_argument('-s', '--font-size', type=int, default=24,
