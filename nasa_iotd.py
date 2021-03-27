@@ -44,6 +44,10 @@ def getRssItems(count):
     for entry in entries:
         description = entry.get('description')
 
+        # Ensure the description is a single line of text. The Pillow library expects
+        # a single line when determining the size of the rendered text.
+        description = ' '.join([l.strip() for l in description.splitlines()])
+
         if len(entry.enclosures) < 1:
             # If there are no enclosures then there are no images so let's move on.
             continue
