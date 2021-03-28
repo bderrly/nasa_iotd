@@ -17,6 +17,7 @@ Dependencies:
 
 import argparse
 import io
+import logging
 import os
 import sys
 from io import BytesIO
@@ -31,6 +32,7 @@ import Xlib.error
 NASA_RSS = 'https://www.nasa.gov/rss/dyn/lg_image_of_the_day.rss'
 MAX_FILE_SIZE = 1 << 25  # 2^25 == 33.6 MiB
 
+logger = logging.getLogger('nasa_iotd')
 
 def getRssItems(rss, count):
     """Returns the image URI, size, and description of the latest count items.
@@ -124,6 +126,7 @@ def reflowText(text, width, font):
     Returns:
         A string, the reformatted text.
     """
+    logger.debug(f'Original description length {font.getlength(text)} pixels')
     if font.getlength(text) <= width - 20:
         return text
 
@@ -131,16 +134,17 @@ def reflowText(text, width, font):
     line = []
     for word in text.split():
         line.append(word)
-        if font.getlength(" ".join(line)) > width - 20:
+        if font.getlength(' '.join(line)) > width - 20:
             line.pop()
-            lines.append(line.copy())
+            lines.append(' '.join(line.copy()))
             line.clear()
             line.append(word)
     # Don't forget to append the final line!
-    lines.append(line)
-    return "\n".join([
-        " ".join(line) for line in lines
-        ])
+    lines.append(' '.join(line))
+    logger.debug(f'Description is {len(lines)} line(s)')
+    for line in lines:
+        logger.debug(f'Line length {font.getlength(line)} pixels')
+    return '\n'.join(line for line in lines)
 
 
 def renderDescription(text, image, font, font_size=24):
@@ -167,18 +171,22 @@ def renderDescription(text, image, font, font_size=24):
     # within it.
     bbox_padding = 20
     textbox = (bbox[0], bbox[1], bbox[2] + bbox_padding, bbox[3] + bbox_padding)
+    logger.debug(f'Text box edges: {textbox}')
 
     # The four points for the background rectangle behind the text.
     bbox_x_anchor = (image.width - textbox[2]) // 2
     bbox_y_anchor = image.height - textbox[3] - (bbox_padding // 2) 
     bbox_x_length = bbox_x_anchor + textbox[2]
     bbox_y_length = bbox_y_anchor + textbox[3]
+    bounding_box = (bbox_x_anchor, bbox_y_anchor, bbox_x_length, bbox_y_length)
+
+    logger.debug(f'Text bounding box: {bounding_box}')
 
     # Anchor the text a little inside the black rectangle behind it.
     text_x_anchor = bbox_x_anchor + 5
     text_y_anchor = bbox_y_anchor + 5
 
-    draw.rectangle((bbox_x_anchor, bbox_y_anchor, bbox_x_length, bbox_y_length), fill='black')
+    draw.rectangle(bounding_box, fill='black')
     draw.text((text_x_anchor, text_y_anchor), text, fill=(20, 148, 20), font=desc_font)
 
 
@@ -197,7 +205,7 @@ def main(argv):
     parser.add_argument('-r', '--resolution', nargs=2, metavar=("WIDTH", "HEIGHT"),
             help="The resolution of the final image. If not supplied the program will attempt to determine the resolution of the monitor using Xlib.")
     parser.add_argument('--rss-file', help="The RSS file or URI to use (for testing).")
-    parser.add_argument('-v', '--verbose', action="store_true", help="Print information about what the program is doing.")
+    parser.add_argument('-v', '--verbose', action='count', default=0, help="Print information about what the program is doing.")
     args = parser.parse_args()
 
     if args.resolution is None:
@@ -205,7 +213,15 @@ def main(argv):
     else:
         resolution = tuple(args.resolution)
 
+    # Setup logging
+    log_level = max(10, 30 - args.verbose * 10)
     output_file = args.output_file
+    logger.setLevel(log_level)
+    ch = logging.StreamHandler()
+    ch.setLevel(log_level)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
 
     if args.input_file is not None:
         # If we are operating on a local file it is probably for testing purposes.
@@ -223,19 +239,22 @@ def main(argv):
     rss_items = getRssItems(rss, args.count)
     for item in rss_items:
         image_data = getImage(item['url'])
-        if (args.verbose):
-            print(f"Processing {item['url']}…")
+        logger.info(f"Processing {item['url']}…")
 
         # Cut out only the file name portion of the image's URL. This will
         # potentially be used for the output file name.
         nasa_image_filename = item['url'].rsplit('/', 1)[1]
         nasa_image = Image.open(image_data)
 
+        logger.debug('Original NASA image is %dx%d pixels', nasa_image.width, nasa_image.height)
+
         # Resize the image (keeping aspect ratio) to fit within the specified resolution.
         nasa_image.thumbnail(resolution)
+        logger.debug(f'Thumbnailed NASA image is {nasa_image.width}x{nasa_image.height} pixels')
 
         # Create a black image the size of the desktop resolution.
         black_image = Image.new('RGB', resolution)
+        logger.debug(f'Black matte is {black_image.width}x{black_image.height} pixels')
 
         # Define the origin coordinates to begin pasting the NASA image
         # over the blank image. This is a tuple of (x, y).
