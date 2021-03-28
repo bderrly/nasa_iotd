@@ -196,7 +196,7 @@ def main(argv):
             help="The size of the font when rendering the image description.")
     parser.add_argument('-r', '--resolution', nargs=2, metavar=("WIDTH", "HEIGHT"),
             help="The resolution of the final image. If not supplied the program will attempt to determine the resolution of the monitor using Xlib.")
-    parser.add_argument('--rss_file', help="The RSS file or URI to use (for testing).")
+    parser.add_argument('--rss-file', help="The RSS file or URI to use (for testing).")
     parser.add_argument('-v', '--verbose', action="store_true", help="Print information about what the program is doing.")
     args = parser.parse_args()
 
