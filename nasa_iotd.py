@@ -16,6 +16,7 @@ Dependencies:
 """
 
 import argparse
+import io
 import os
 import sys
 from io import BytesIO
@@ -74,13 +75,17 @@ def getImage(image_url):
     """Download the image from NASA.
     
     Args:
-        image_url: The string URI to download.
+        image_url: The string URI to download, or a path to a local file for testing.
         
     Returns:
-        A buffer of bytes containing the image data.
+        A BufferedIO object containing the image data.
+
+        N.B. Be sure to close() the buffer when you are done with it.
     """
-    req = requests.get(image_url)
-    return req.content
+    if image_url.startswith('http'):
+        req = requests.get(image_url)
+        return io.BytesIO(req.content)
+    return open(image_url, 'rb')
 
 
 def getScreenResolution():
@@ -221,12 +226,10 @@ def main(argv):
         if (args.verbose):
             print(f"Processing {item['url']}…")
 
-        if int(item['size']) != int(len(image_data)):
-            print(f"File size differs between RSS and downloaded image: {item['size']} versus {len(image_data)} bytes.")
         # Cut out only the file name portion of the image's URL. This will
         # potentially be used for the output file name.
         nasa_image_filename = item['url'].rsplit('/', 1)[1]
-        nasa_image = Image.open(BytesIO(image_data))
+        nasa_image = Image.open(image_data)
 
         # Resize the image (keeping aspect ratio) to fit within the specified resolution.
         nasa_image.thumbnail(resolution)
@@ -236,12 +239,16 @@ def main(argv):
 
         # Define the origin coordinates to begin pasting the NASA image
         # over the blank image. This is a tuple of (x, y).
-        nasa_origin= (
-                int((.5 * black_image.width) - (.5 * nasa_image.width)),
-                int((.5 * black_image.height) - (.5 * nasa_image.height)))
+        nasa_origin = (
+            int((.5 * black_image.width) - (.5 * nasa_image.width)),
+            int((.5 * black_image.height) - (.5 * nasa_image.height))
+        )
 
         # Paste the NASA image over the newly created black image.
         black_image.paste(nasa_image, nasa_origin)
+
+        # Now that we are done with the original Image data we can safely close the byte buffer.
+        image_data.close()
 
         # Overlay the description from the RSS item over the NASA image.
         description = item.get('desc')
