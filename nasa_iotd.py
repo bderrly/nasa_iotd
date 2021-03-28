@@ -27,20 +27,25 @@ from Xlib import display
 import Xlib.error
 
 
+NASA_RSS = 'https://www.nasa.gov/rss/dyn/lg_image_of_the_day.rss'
 MAX_FILE_SIZE = 1 << 25  # 2^25 == 33.6 MiB
 
 
-def getRssItems(count):
+def getRssItems(rss, count):
     """Returns the image URI, size, and description of the latest count items.
+
+    Args:
+        rss: The RSS URI or local file to parse.
+        count: The number of items to fetch from the RSS feed.
     
     Returns:
         A list of dicts containing the URI and size of the image to download,
         and a string description of the image.
     """
-    nasa_rss = feedparser.parse('https://www.nasa.gov/rss/dyn/lg_image_of_the_day.rss')
+    rss = feedparser.parse(rss)
 
     parsed_items = list()
-    entries = nasa_rss.entries[:count]
+    entries = rss.entries[:count]
     for entry in entries:
         description = entry.get('description')
 
@@ -186,6 +191,7 @@ def main(argv):
             help="The size of the font when rendering the image description.")
     parser.add_argument('-r', '--resolution', nargs=2, metavar=("WIDTH", "HEIGHT"),
             help="The resolution of the final image. If not supplied the program will attempt to determine the resolution of the monitor using Xlib.")
+    parser.add_argument('--rss_file', help="The RSS file or URI to use (for testing).")
     parser.add_argument('-v', '--verbose', action="store_true", help="Print information about what the program is doing.")
     args = parser.parse_args()
 
@@ -208,7 +214,8 @@ def main(argv):
         writeImageToDisk(output_file, image)
         return
 
-    rss_items = getRssItems(args.count)
+    rss = next(rf for rf in [args.rss_file, NASA_RSS] if rf is not None)
+    rss_items = getRssItems(rss, args.count)
     for item in rss_items:
         image_data = getImage(item['url'])
         if (args.verbose):
