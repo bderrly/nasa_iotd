@@ -187,7 +187,7 @@ def renderDescription(text, image, font, font_size=24):
     text_y_anchor = bbox_y_anchor + 5
 
     draw.rectangle(bounding_box, fill='black')
-    draw.text((text_x_anchor, text_y_anchor), text, fill=(20, 148, 20), font=desc_font)
+    draw.text((text_x_anchor, text_y_anchor), description, fill=(20, 148, 20), font=desc_font)
 
 
 def main(argv):
