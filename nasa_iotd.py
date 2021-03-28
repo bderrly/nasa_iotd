@@ -176,7 +176,7 @@ def main(argv):
     parser = argparse.ArgumentParser(
             description='Downloads, modifies, and saves the "Image of the Day" from nasa.gov.')
     parser.add_argument('-c', '--count', type=int, default=1, help="The number of RSS items to retrieve. (default: 1)")
-    parser.add_argument('-d', '--directory', default=os.environ['PWD'], help='Directory to write image file. (default: $PWD)')
+    parser.add_argument('-d', '--directory', help='Directory to write image file. (defaults to $PWD)')
     parser.add_argument('-i', '--input-file',
             help="The name of the file to read from disk. (Does not read from RSS and adds no description to the final image.)")
     parser.add_argument('-f', '--font', default="fonts/Play/Play-Bold.ttf",
@@ -241,7 +241,8 @@ def main(argv):
         if description is not None:
             renderDescription(description, black_image, args.font, args.font_size)
 
-        output_file = os.path.join(args.directory, nasa_image_filename)
+        directory = next(d for d in [args.directory, os.environ['PWD']] if d is not None)
+        output_file = os.path.join(directory, nasa_image_filename)
         writeImageToDisk(output_file, black_image)
 
 
