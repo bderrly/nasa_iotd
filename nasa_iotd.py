@@ -165,11 +165,12 @@ def renderDescription(text, image, font, font_size=24):
     # overlay. Return is a 4-tuple: (x anchor, y anchor, x destination,
     # y destination).
     bbox = draw.textbbox((0,0), description, font=desc_font)
+    logger.debug(f'Original text bounding box: {bbox}')
 
     # Add some extra pixels to the width and height of the bbox. This
     # will allow for better framing of the background box and text
     # within it.
-    bbox_padding = 20
+    bbox_padding = 10
     textbox = (bbox[0], bbox[1], bbox[2] + bbox_padding, bbox[3] + bbox_padding)
     logger.debug(f'Text box edges: {textbox}')
 
