@@ -159,36 +159,18 @@ def renderDescription(text, image, font, font_size=24):
     draw = ImageDraw.Draw(image)
     desc_font = ImageFont.truetype(font=font, size=font_size)
     description = reflowText(text, image.width, desc_font)
-    
-    # Find the bounding box (bbox) of the rendered text. These points
-    # will be used for placing the background rectangle and text
-    # overlay. Return is a 4-tuple: (x anchor, y anchor, x destination,
-    # y destination).
-    bbox = draw.textbbox((0,0), description, font=desc_font)
-    logger.debug(f'Original text bounding box: {bbox}')
 
-    # Add some extra pixels to the width and height of the bbox. This
-    # will allow for better framing of the background box and text
-    # within it.
-    bbox_padding = 10
-    textbox = (bbox[0], bbox[1], bbox[2] + bbox_padding, bbox[3] + bbox_padding)
-    logger.debug(f'Text box edges: {textbox}')
-
-    # The four points for the background rectangle behind the text.
-    bbox_x_anchor = (image.width - textbox[2]) // 2
-    bbox_y_anchor = image.height - textbox[3] - (bbox_padding // 2) 
-    bbox_x_length = bbox_x_anchor + textbox[2]
-    bbox_y_length = bbox_y_anchor + textbox[3]
-    bounding_box = (bbox_x_anchor, bbox_y_anchor, bbox_x_length, bbox_y_length)
-
-    logger.debug(f'Text bounding box: {bounding_box}')
-
-    # Anchor the text a little inside the black rectangle behind it.
-    text_x_anchor = bbox_x_anchor + 5
-    text_y_anchor = bbox_y_anchor + 5
-
-    draw.rectangle(bounding_box, fill='black')
-    draw.text((text_x_anchor, text_y_anchor), description, fill=(20, 148, 20), font=desc_font)
+    desc_xy = (image.width//2, image.height-10)
+    desc_bbox = draw.textbbox(desc_xy, description, anchor='md', align='center', font=desc_font)
+    logger.debug(f'Text bbox: {desc_bbox}')
+    desc_matte = list()
+    desc_matte.append(desc_bbox[0] - 5)
+    desc_matte.append(desc_bbox[1] - 5)
+    desc_matte.append(desc_bbox[2] + 5)
+    desc_matte.append(desc_bbox[3] + 5)
+    logger.debug(f'Text matte: {desc_matte}')
+    draw.rectangle(desc_matte, fill='black')
+    draw.text(desc_xy, description, anchor='md', fill=(20, 148, 20), align='center', font=desc_font)
 
 
 def main(argv):
