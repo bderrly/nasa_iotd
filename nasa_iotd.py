@@ -156,7 +156,7 @@ def renderDescription(text, image, font, font_size=24):
         font: A PIL.ImageFont, the font to use when rendering.
         font_size: An int, the font size for rendering the text.
     """
-    draw = ImageDraw.Draw(image)
+    draw = ImageDraw.Draw(image, 'RGBA')
     desc_font = ImageFont.truetype(font=font, size=font_size)
     description = reflowText(text, image.width, desc_font)
 
@@ -169,7 +169,7 @@ def renderDescription(text, image, font, font_size=24):
     desc_matte.append(desc_bbox[2] + 5)
     desc_matte.append(desc_bbox[3] + 5)
     logger.debug(f'Text matte: {desc_matte}')
-    draw.rectangle(desc_matte, fill='black')
+    draw.rectangle(desc_matte, fill=(0, 0, 0, int(256*.75)))
     draw.text(desc_xy, description, anchor='md', fill=(20, 148, 20), align='center', font=desc_font)
 
 
