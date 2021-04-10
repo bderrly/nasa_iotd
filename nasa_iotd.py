@@ -99,9 +99,9 @@ def getScreenResolution():
     try:
         d = display.Display()
     except Xlib.error.DisplayError:
-        print("Failed attempting to retrieve display information from X. Perhaps you are not running in X?",
-                file=sys.stderr)
-        print("If you are not running in X you must supply the --resolution flag.", file=sys.stderr)
+        logger.error("If you are not running in X you must supply the --resolution flag.")
+        logger.exception("Failed attempting to retrieve display information from X. "
+                "Perhaps you are not running in X or $DISPLAY is unset?")
         sys.exit(1)
     root_screen = d.screen()
     return (root_screen.width_in_pixels, root_screen.height_in_pixels)
@@ -111,8 +111,7 @@ def writeImageToDisk(file_name, image):
     try:
         image.save(file_name, 'JPEG', quality=95)
     except OSError as ose:
-        print(f"I/O failure: {ose}", file=sys.stderr)
-        sys.exit(1)
+        logger.exception('Could not save image.')
 
 
 def reflowText(text, width, font):
